@@ -1,5 +1,3 @@
--- Freecam System with Full Movement in All Directions (Mobile Friendly)
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -37,8 +35,8 @@ end
 
 -- UI Setup
 local gui = Instance.new("ScreenGui", player.PlayerGui)
-gu ResetOnSpawn = false
-gu.Name = "FreecamGui"
+gui.ResetOnSpawn = false
+gui.Name = "FreecamGui"
 
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 130, 0, 60)
@@ -73,7 +71,7 @@ joystickBase.Active = true
 
 local joystickThumb = Instance.new("Frame", joystickBase)
 joystickThumb.Size = UDim2.new(0, 50, 0, 50)
-joystickThumb.Position = UDim2.new(0.5, -25, 0.5, -25)
+joystickThumb.Position = UDim2.new(0.5, 0, 0.5, 0)
 joystickThumb.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
 joystickThumb.BackgroundTransparency = 0.3
 joystickThumb.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -101,14 +99,17 @@ downBtn.Visible = false
 downBtn.AnchorPoint = Vector2.new(1, 1)
 downBtn.ZIndex = 10
 
+-- Movement Vars
 local isFreecam = false
 local moveVector = Vector3.new()
 local camRotation = Vector2.new(0,0)
 local sensitivity = 0.005
 local speed = 2
 
+-- Rotate by Touch
 local dragging = false
 local lastPos = nil
+
 UserInputService.TouchStarted:Connect(function(input)
 	if not isFreecam then return end
 	if input.UserInputType == Enum.UserInputType.Touch then
@@ -132,24 +133,19 @@ UserInputService.TouchEnded:Connect(function(input)
 	end
 end)
 
+-- Joystick
 local joystickDragging = false
+local maxRadius = 50
+
 local function updateJoystick(inputPos)
 	local center = joystickBase.AbsolutePosition + joystickBase.AbsoluteSize / 2
+	maxRadius = joystickBase.AbsoluteSize.X / 2
+
 	local delta = inputPos - center
 	local direction = delta.Magnitude > 0 and delta.Unit or Vector2.zero
 	local distance = math.min(delta.Magnitude, maxRadius)
 	local offset = direction * distance
 
-	joystickThumb.Position = UDim2.new(0.5, offset.X, 0.5, offset.Y)
-	moveVector = Vector3.new(offset.X / maxRadius, 0, offset.Y / maxRadius)
-end
-local maxRadius = joystickBase.AbsoluteSize.X / 2
-
-local function updateJoystick(inputPos)
-	local delta = inputPos - joystickCenter
-	local direction = (delta).Unit
-	local distance = math.min(delta.Magnitude, maxRadius)
-	local offset = direction * distance
 	joystickThumb.Position = UDim2.new(0.5, offset.X, 0.5, offset.Y)
 	moveVector = Vector3.new(offset.X / maxRadius, 0, offset.Y / maxRadius)
 end
@@ -175,6 +171,7 @@ joystickBase.InputEnded:Connect(function(input)
 	end
 end)
 
+-- Up/Down Buttons
 local upPressed = false
 local downPressed = false
 
@@ -183,6 +180,7 @@ upBtn.MouseButton1Up:Connect(function() upPressed = false end)
 downBtn.MouseButton1Down:Connect(function() downPressed = true end)
 downBtn.MouseButton1Up:Connect(function() downPressed = false end)
 
+-- Toggle Freecam On
 toggleBtn.MouseButton1Click:Connect(function()
 	if not isFreecam then
 		local head = player.Character and player.Character:FindFirstChild("Head")
@@ -197,10 +195,15 @@ toggleBtn.MouseButton1Click:Connect(function()
 			joystickBase.Visible = true
 			upBtn.Visible = true
 			downBtn.Visible = true
+
+			-- Wait 1 frame for AbsoluteSize to be ready
+			RunService.RenderStepped:Wait()
+			maxRadius = joystickBase.AbsoluteSize.X / 2
 		end
 	end
 end)
 
+-- Toggle Freecam Off
 returnBtn.MouseButton1Click:Connect(function()
 	if isFreecam then
 		enableCharacterMovement()
@@ -214,14 +217,13 @@ returnBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
+-- Main Update Loop
 RunService.RenderStepped:Connect(function()
 	if isFreecam then
-		local cf = CFrame.new(camera.CFrame.Position)
-			* CFrame.Angles(0, camRotation.X, 0)
-			* CFrame.Angles(camRotation.Y, 0, 0)
+		local rotationCFrame = CFrame.Angles(0, camRotation.X, 0) * CFrame.Angles(camRotation.Y, 0, 0)
+		local forward = rotationCFrame.LookVector
+		local right = rotationCFrame.RightVector
 
-		local right = camera.CFrame.RightVector
-		local forward = camera.CFrame.LookVector
 		local movement = (right * moveVector.X + forward * -moveVector.Z)
 		local vertical = 0
 		if upPressed then vertical = 1 elseif downPressed then vertical = -1 end
@@ -230,9 +232,6 @@ RunService.RenderStepped:Connect(function()
 			movement = movement.Unit * speed
 		end
 
-		camera.CFrame = camera.CFrame + movement + Vector3.new(0, vertical * speed, 0)
-		camera.CFrame = CFrame.new(camera.CFrame.Position)
-			* CFrame.Angles(0, camRotation.X, 0)
-			* CFrame.Angles(camRotation.Y, 0, 0)
+		camera.CFrame = CFrame.new(camera.CFrame.Position + movement + Vector3.new(0, vertical * speed, 0)) * rotationCFrame
 	end
 end)
