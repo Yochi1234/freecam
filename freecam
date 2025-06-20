@@ -1,87 +1,127 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local player = Players.LocalPlayer
 repeat wait() until player and player.Character and player:FindFirstChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
--- Create GUI
+-- แก้ตัวแปรล็อคการเดินตัวละคร
+local walkDisabled = false
+
+-- ฟังก์ชันปิดการเดินตัวละคร
+local function disableCharacterMovement()
+	local character = player.Character
+	if character then
+		local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = 0
+			humanoid.JumpPower = 0
+		end
+	end
+end
+
+-- ฟังก์ชันเปิดการเดินตัวละคร
+local function enableCharacterMovement()
+	local character = player.Character
+	if character then
+		local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = 16
+			humanoid.JumpPower = 50
+		end
+	end
+end
+
+-- สร้าง GUI
 local gui = Instance.new("ScreenGui", player.PlayerGui)
-gui.Name = "AstralGui"
+gui.Name = "FreecamGui"
 gui.ResetOnSpawn = false
 
--- Freecam toggle button
+-- ปุ่ม Freecam toggle
 local toggleBtn = Instance.new("TextButton", gui)
-toggleBtn.Size = UDim2.new(0, 120, 0, 50)
-toggleBtn.Position = UDim2.new(0, 10, 1, -60)
+toggleBtn.Size = UDim2.new(0, 130, 0, 60)
+toggleBtn.Position = UDim2.new(0, 20, 1, -90)
 toggleBtn.Text = "Freecam"
 toggleBtn.TextScaled = true
 toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+toggleBtn.AnchorPoint = Vector2.new(0, 1)
+toggleBtn.ZIndex = 10
 
--- Return button
+-- ปุ่ม Return
 local returnBtn = Instance.new("TextButton", gui)
-returnBtn.Size = UDim2.new(0, 120, 0, 50)
-returnBtn.Position = UDim2.new(0, 140, 1, -60)
+returnBtn.Size = UDim2.new(0, 130, 0, 60)
+returnBtn.Position = UDim2.new(0, 170, 1, -90)
 returnBtn.Text = "Return"
 returnBtn.TextScaled = true
 returnBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+returnBtn.AnchorPoint = Vector2.new(0, 1)
 returnBtn.Visible = false
+returnBtn.ZIndex = 10
 
--- Virtual joystick base for movement (XZ)
+-- Virtual joystick base
 local joystickBase = Instance.new("Frame", gui)
-joystickBase.Size = UDim2.new(0, 100, 0, 100)
-joystickBase.Position = UDim2.new(0, 10, 1, -180)
-joystickBase.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+joystickBase.Size = UDim2.new(0, 110, 0, 110)
+joystickBase.Position = UDim2.new(0, 20, 1, -230)
+joystickBase.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 joystickBase.BackgroundTransparency = 0.5
 joystickBase.Visible = false
 joystickBase.ClipsDescendants = true
-joystickBase.AnchorPoint = Vector2.new(0,1)
+joystickBase.AnchorPoint = Vector2.new(0, 1)
+joystickBase.ZIndex = 10
+joystickBase.BorderSizePixel = 0
+joystickBase.Active = true
 
 local joystickThumb = Instance.new("Frame", joystickBase)
-joystickThumb.Size = UDim2.new(0, 40, 0, 40)
-joystickThumb.Position = UDim2.new(0.5, -20, 0.5, -20)
+joystickThumb.Size = UDim2.new(0, 50, 0, 50)
+joystickThumb.Position = UDim2.new(0.5, -25, 0.5, -25)
 joystickThumb.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
 joystickThumb.BackgroundTransparency = 0.3
 joystickThumb.AnchorPoint = Vector2.new(0.5, 0.5)
 joystickThumb.BorderSizePixel = 0
+joystickThumb.ZIndex = 11
 joystickThumb.Visible = true
 
--- Up and Down buttons for Y axis
+-- ปุ่มขึ้น-ลงแกน Y
 local upBtn = Instance.new("TextButton", gui)
-upBtn.Size = UDim2.new(0, 50, 0, 50)
-upBtn.Position = UDim2.new(1, -70, 1, -230)
-upBtn.Text = "Up"
+upBtn.Size = UDim2.new(0, 60, 0, 60)
+upBtn.Position = UDim2.new(1, -90, 1, -230)
+upBtn.Text = "▲"
 upBtn.TextScaled = true
 upBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
 upBtn.Visible = false
+upBtn.AnchorPoint = Vector2.new(1, 1)
+upBtn.ZIndex = 10
 
 local downBtn = Instance.new("TextButton", gui)
-downBtn.Size = UDim2.new(0, 50, 0, 50)
-downBtn.Position = UDim2.new(1, -130, 1, -230)
-downBtn.Text = "Down"
+downBtn.Size = UDim2.new(0, 60, 0, 60)
+downBtn.Position = UDim2.new(1, -160, 1, -230)
+downBtn.Text = "▼"
 downBtn.TextScaled = true
 downBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
 downBtn.Visible = false
+downBtn.AnchorPoint = Vector2.new(1, 1)
+downBtn.ZIndex = 10
 
--- Variables
-local isAstral = false
+-- ตัวแปรสถานะ
+local isFreecam = false
 local moveVector = Vector3.new()
-local verticalMove = 0
-local camRotation = Vector2.new(0,0) -- x = yaw, y = pitch
+local camRotation = Vector2.new(0,0) -- yaw, pitch
 local sensitivity = 0.005
-local speed = 1
+local speed = 2
 
+-- ฟังก์ชัน clamp
 local function clamp(val, min, max)
 	return math.max(min, math.min(max, val))
 end
 
--- Touch drag to rotate camera
+-- Touch drag หมุนกล้อง
 local dragging = false
 local lastPos = nil
 
 UserInputService.TouchStarted:Connect(function(input)
-	if not isAstral then return end
+	if not isFreecam then return end
 	if input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		lastPos = input.Position
@@ -89,7 +129,7 @@ UserInputService.TouchStarted:Connect(function(input)
 end)
 
 UserInputService.TouchMoved:Connect(function(input)
-	if dragging and isAstral then
+	if dragging and isFreecam then
 		local delta = input.Position - lastPos
 		lastPos = input.Position
 		camRotation = camRotation + Vector2.new(-delta.X, -delta.Y) * sensitivity
@@ -103,7 +143,7 @@ UserInputService.TouchEnded:Connect(function(input)
 	end
 end)
 
--- Virtual joystick logic
+-- Joystick Logic
 local joystickDragging = false
 local joystickCenter = joystickBase.AbsolutePosition + joystickBase.AbsoluteSize/2
 local maxRadius = joystickBase.AbsoluteSize.X / 2
@@ -117,7 +157,7 @@ local function updateJoystick(inputPos)
 
 	joystickThumb.Position = UDim2.new(0.5, offset.X, 0.5, offset.Y)
 
-	-- Convert to Vector3 for movement (X,Z)
+	-- แปลงเป็น Vector3 สำหรับการเดิน (X,Z)
 	local x = offset.X / maxRadius
 	local z = offset.Y / maxRadius
 	moveVector = Vector3.new(x, 0, z)
@@ -144,7 +184,7 @@ joystickBase.InputEnded:Connect(function(input)
 	end
 end)
 
--- Up/down buttons
+-- ปุ่มขึ้น-ลงแกน Y
 local upPressed = false
 local downPressed = false
 
@@ -161,15 +201,19 @@ downBtn.MouseButton1Up:Connect(function()
 	downPressed = false
 end)
 
--- Toggle freecam
+-- เปิด freecam
 toggleBtn.MouseButton1Click:Connect(function()
-	if not isAstral then
+	if not isFreecam then
 		local head = player.Character and player.Character:FindFirstChild("Head")
 		if head then
+			-- disable character movement
+			disableCharacterMovement()
+			-- set camera
 			camera.CameraType = Enum.CameraType.Scriptable
-			camera.CFrame = head.CFrame + Vector3.new(0,5,0)
-			camRotation = Vector2.new(0,0)
-			isAstral = true
+			camera.CFrame = head.CFrame + Vector3.new(0, 5, 0)
+			camRotation = Vector2.new(0, 0)
+			isFreecam = true
+			-- show gui
 			toggleBtn.Visible = false
 			returnBtn.Visible = true
 			joystickBase.Visible = true
@@ -179,11 +223,15 @@ toggleBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Return to body
+-- ปิด freecam (กลับร่าง)
 returnBtn.MouseButton1Click:Connect(function()
-	if isAstral then
+	if isFreecam then
+		-- enable character movement
+		enableCharacterMovement()
+		-- กล้องกลับแบบปกติ
 		camera.CameraType = Enum.CameraType.Custom
-		isAstral = false
+		isFreecam = false
+		-- ซ่อน gui
 		toggleBtn.Visible = true
 		returnBtn.Visible = false
 		joystickBase.Visible = false
@@ -192,20 +240,22 @@ returnBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Update camera every frame
+-- อัพเดตกล้องทุกเฟรม
 RunService.RenderStepped:Connect(function()
-	if isAstral then
-		-- Rotate camera
-		local cf = CFrame.new(camera.CFrame.Position) 
-			* CFrame.Angles(0, camRotation.X, 0) 
+	if isFreecam then
+		local cf = CFrame.new(camera.CFrame.Position)
+			* CFrame.Angles(0, camRotation.X, 0)
 			* CFrame.Angles(camRotation.Y, 0, 0)
 
-		-- Movement vector relative to camera rotation
 		local moveDir = cf:VectorToWorldSpace(Vector3.new(moveVector.X, 0, moveVector.Z))
 		local vertical = 0
 		if upPressed then vertical = 1 elseif downPressed then vertical = -1 end
 
-		camera.CFrame = camera.CFrame + moveDir.Unit * speed + Vector3.new(0, vertical * speed, 0)
+		if moveDir.Magnitude > 0 then
+			moveDir = moveDir.Unit
+		end
+
+		camera.CFrame = camera.CFrame + moveDir * speed + Vector3.new(0, vertical * speed, 0)
 		camera.CFrame = CFrame.new(camera.CFrame.Position) * CFrame.Angles(0, camRotation.X, 0) * CFrame.Angles(camRotation.Y, 0, 0)
 	end
 end)
