@@ -1,96 +1,98 @@
--- [ LocalScript in StarterPlayerScripts ]
+-- [ ถอดจิต Roblox มือถือ พร้อมปุ่มกลับเข้าร่าง ]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
-
 local player = Players.LocalPlayer
+
+repeat wait() until player.Character and player:FindFirstChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
--- Create GUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AstralGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
+-- GUI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "AstralGui"
+gui.ResetOnSpawn = false
 
--- Toggle Button
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Name = "ToggleButton"
+-- ปุ่มถอดจิต
+local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 120, 0, 50)
 toggleBtn.Position = UDim2.new(0, 10, 1, -60)
 toggleBtn.Text = "ถอดจิต"
-toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 toggleBtn.TextScaled = true
-toggleBtn.Parent = screenGui
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 
--- Control Frame
-local controlFrame = Instance.new("Frame")
-controlFrame.Name = "ControlFrame"
+-- ปุ่มกลับเข้าร่าง
+local returnBtn = Instance.new("TextButton", gui)
+returnBtn.Size = UDim2.new(0, 120, 0, 50)
+returnBtn.Position = UDim2.new(0, 140, 1, -60)
+returnBtn.Text = "กลับเข้าร่าง"
+returnBtn.TextScaled = true
+returnBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+returnBtn.Visible = false
+
+-- ปุ่มควบคุม
+local controlFrame = Instance.new("Frame", gui)
 controlFrame.Size = UDim2.new(0, 200, 0, 200)
-controlFrame.Position = UDim2.new(1, -220, 1, -220)
-controlFrame.BackgroundTransparency = 0.4
-controlFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+controlFrame.Position = UDim2.new(1, -210, 1, -210)
 controlFrame.Visible = false
-controlFrame.Parent = screenGui
+controlFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 
-local directions = {
-	{"Forward", "↑", Vector3.new(0, 0, -1), UDim2.new(0.5, -25, 0, 0)},
-	{"Back", "↓", Vector3.new(0, 0, 1), UDim2.new(0.5, -25, 0, 100)},
-	{"Left", "←", Vector3.new(-1, 0, 0), UDim2.new(0, 0, 0, 50)},
-	{"Right", "→", Vector3.new(1, 0, 0), UDim2.new(0, 100, 0, 50)},
-	{"Up", "⇧", Vector3.new(0, 1, 0), UDim2.new(0, 0, 0, 0)},
-	{"Down", "⇩", Vector3.new(0, -1, 0), UDim2.new(0, 100, 0, 0)},
+local dirs = {
+	{ "↑", Vector3.new(0, 0, -1), UDim2.new(0.5, -25, 0, 0) }, -- Forward
+	{ "↓", Vector3.new(0, 0, 1), UDim2.new(0.5, -25, 0, 100) }, -- Back
+	{ "←", Vector3.new(-1, 0, 0), UDim2.new(0, 0, 0, 50) }, -- Left
+	{ "→", Vector3.new(1, 0, 0), UDim2.new(0, 100, 0, 50) }, -- Right
+	{ "⇧", Vector3.new(0, 1, 0), UDim2.new(0, 0, 0, 0) }, -- Up
+	{ "⇩", Vector3.new(0, -1, 0), UDim2.new(0, 100, 0, 0) }, -- Down
 }
 
+local moveDir = Vector3.zero
+local isAstral = false
+local originalCFrame = nil
 local buttons = {}
-for _, info in ipairs(directions) do
-	local btn = Instance.new("TextButton")
-	btn.Name = info[1]
-	btn.Text = info[2]
+
+for _, d in ipairs(dirs) do
+	local btn = Instance.new("TextButton", controlFrame)
+	btn.Text = d[1]
 	btn.Size = UDim2.new(0, 50, 0, 50)
-	btn.Position = info[4]
+	btn.Position = d[3]
 	btn.TextScaled = true
-	btn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-	btn.Parent = controlFrame
-	buttons[btn] = info[3]
+	btn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+
+	btn.MouseButton1Down:Connect(function()
+		moveDir = d[2]
+	end)
+	btn.MouseButton1Up:Connect(function()
+		moveDir = Vector3.zero
+	end)
 end
 
--- Logic
-local isAstral = false
-local moveDirection = Vector3.new()
-local speed = 1
-
--- Toggle Astral View
+-- ปุ่มถอดจิต
 toggleBtn.MouseButton1Click:Connect(function()
-	isAstral = not isAstral
-	if isAstral then
-		camera.CameraType = Enum.CameraType.Scriptable
-		camera.CFrame = player.Character.Head.CFrame + Vector3.new(0, 5, 0)
-		controlFrame.Visible = true
-	else
-		camera.CameraType = Enum.CameraType.Custom
-		controlFrame.Visible = false
+	if not isAstral then
+		local head = player.Character:FindFirstChild("Head")
+		if head then
+			originalCFrame = head.CFrame
+			camera.CameraType = Enum.CameraType.Scriptable
+			camera.CFrame = head.CFrame + Vector3.new(0, 5, 0)
+			controlFrame.Visible = true
+			returnBtn.Visible = true
+			isAstral = true
+		end
 	end
 end)
 
--- Movement per button
-for btn, dir in pairs(buttons) do
-	local holding = false
-	btn.MouseButton1Down:Connect(function()
-		holding = true
-		while holding and isAstral do
-			moveDirection = dir
-			wait(0.05)
-		end
-	end)
-	btn.MouseButton1Up:Connect(function()
-		holding = false
-		moveDirection = Vector3.new()
-	end)
-end
+-- ปุ่มกลับเข้าร่าง
+returnBtn.MouseButton1Click:Connect(function()
+	if isAstral then
+		camera.CameraType = Enum.CameraType.Custom
+		controlFrame.Visible = false
+		returnBtn.Visible = false
+		isAstral = false
+	end
+end)
 
--- Move camera each frame
+-- เคลื่อนกล้อง
 RunService.RenderStepped:Connect(function()
-	if isAstral and moveDirection.Magnitude > 0 then
-		camera.CFrame = camera.CFrame + camera.CFrame:VectorToWorldSpace(moveDirection.Unit * speed)
+	if isAstral and moveDir.Magnitude > 0 then
+		camera.CFrame = camera.CFrame + camera.CFrame:VectorToWorldSpace(moveDir.Unit * 1)
 	end
 end)
