@@ -1,63 +1,73 @@
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local ContextActionService = game:GetService("ContextActionService")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
+-- GUI
+local gui = player:WaitForChild("PlayerGui"):WaitForChild("AstralGUI")
+local toggleBtn = gui:WaitForChild("ToggleButton")
+local controls = gui:WaitForChild("ControlFrame")
+
+-- ปุ่มควบคุม
+local btnUp = controls:WaitForChild("Up")
+local btnDown = controls:WaitForChild("Down")
+local btnLeft = controls:WaitForChild("Left")
+local btnRight = controls:WaitForChild("Right")
+local btnForward = controls:WaitForChild("Forward")
+local btnBack = controls:WaitForChild("Back")
+
+-- สถานะ
 local isAstral = false
-local moveSpeed = 50
+local moveDirection = Vector3.new()
+local speed = 1
 
--- กล้องแยกร่าง
-local cameraPart = Instance.new("Part")
-cameraPart.Anchored = true
-cameraPart.CanCollide = false
-cameraPart.Transparency = 1
-cameraPart.Size = Vector3.new(1, 1, 1)
-cameraPart.Name = "AstralCamPart"
-cameraPart.Parent = workspace
-
-local connection
-
--- ควบคุมการเคลื่อนกล้อง
-local function onRenderStep(dt)
-	if isAstral then
-		local moveVec = Vector3.zero
-		local inputVector = Vector3.zero
-
-		-- รองรับมือถือด้วย Thumbstick
-		inputVector = UserInputService:GetGamepadState(Enum.UserInputType.Gamepad1)[1] and 
-                      UserInputService:GetGamepadState(Enum.UserInputType.Gamepad1)[1].Position or Vector3.zero
-
-		-- หรือ ใช้ WASD/ปุ่มจำลอง
-		if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += camera.CFrame.LookVector end
-		if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= camera.CFrame.LookVector end
-		if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= camera.CFrame.RightVector end
-		if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += camera.CFrame.RightVector end
-
-		-- เพิ่มทิศทางจาก Thumbstick (มือถือ)
-		moveVec += (camera.CFrame.LookVector * inputVector.Y)
-		moveVec += (camera.CFrame.RightVector * inputVector.X)
-
-		cameraPart.Position += moveVec.Unit * moveSpeed * dt
-		camera.CFrame = CFrame.new(cameraPart.Position, cameraPart.Position + camera.CFrame.LookVector)
-	end
-end
-
--- เปิด/ปิดโหมดถอดจิต
-local function toggleAstralMode()
+-- ปรับกล้อง
+local function toggleAstral()
 	isAstral = not isAstral
 	if isAstral then
-		cameraPart.Position = camera.CFrame.Position
 		camera.CameraType = Enum.CameraType.Scriptable
-		connection = RunService.RenderStepped:Connect(onRenderStep)
+		camera.CFrame = player.Character.Head.CFrame + Vector3.new(0, 5, 0)
+		controls.Visible = true
 	else
 		camera.CameraType = Enum.CameraType.Custom
-		if connection then connection:Disconnect() end
+		controls.Visible = false
 	end
 end
 
--- เชื่อมกับปุ่ม GUI (ไว้ใน StarterGui)
-local guiButton = player:WaitForChild("PlayerGui"):WaitForChild("AstralGui"):WaitForChild("ToggleButton")
-guiButton.MouseButton1Click:Connect(toggleAstralMode)
+-- ผูกปุ่ม
+toggleBtn.MouseButton1Click:Connect(toggleAstral)
+
+-- ปุ่มกดค้างเคลื่อนกล้อง
+local btnMap = {
+	[btnForward] = Vector3.new(0, 0, -1),
+	[btnBack] = Vector3.new(0, 0, 1),
+	[btnLeft] = Vector3.new(-1, 0, 0),
+	[btnRight] = Vector3.new(1, 0, 0),
+	[btnUp] = Vector3.new(0, 1, 0),
+	[btnDown] = Vector3.new(0, -1, 0),
+}
+
+for button, dir in pairs(btnMap) do
+	local holding = false
+
+	button.MouseButton1Down:Connect(function()
+		holding = true
+		while holding and isAstral do
+			moveDirection += dir
+			wait(0.05)
+		end
+	end)
+
+	button.MouseButton1Up:Connect(function()
+		moveDirection = Vector3.new()
+		holding = false
+	end)
+end
+
+-- เคลื่อนกล้องทุกเฟรม
+RunService.RenderStepped:Connect(function()
+	if isAstral and moveDirection.Magnitude > 0 then
+		camera.CFrame = camera.CFrame + camera.CFrame:VectorToWorldSpace(moveDirection.Unit * speed)
+	end
+end)
