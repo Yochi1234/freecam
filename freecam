@@ -1,98 +1,211 @@
--- [ ถอดจิต Roblox มือถือ พร้อมปุ่มกลับเข้าร่าง ]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
 
-repeat wait() until player.Character and player:FindFirstChild("PlayerGui")
+local player = Players.LocalPlayer
+repeat wait() until player and player.Character and player:FindFirstChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
--- GUI
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+-- Create GUI
+local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.Name = "AstralGui"
 gui.ResetOnSpawn = false
 
--- ปุ่มถอดจิต
+-- Freecam toggle button
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 120, 0, 50)
 toggleBtn.Position = UDim2.new(0, 10, 1, -60)
-toggleBtn.Text = "ถอดจิต"
+toggleBtn.Text = "Freecam"
 toggleBtn.TextScaled = true
 toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 
--- ปุ่มกลับเข้าร่าง
+-- Return button
 local returnBtn = Instance.new("TextButton", gui)
 returnBtn.Size = UDim2.new(0, 120, 0, 50)
 returnBtn.Position = UDim2.new(0, 140, 1, -60)
-returnBtn.Text = "กลับเข้าร่าง"
+returnBtn.Text = "Return"
 returnBtn.TextScaled = true
 returnBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
 returnBtn.Visible = false
 
--- ปุ่มควบคุม
-local controlFrame = Instance.new("Frame", gui)
-controlFrame.Size = UDim2.new(0, 200, 0, 200)
-controlFrame.Position = UDim2.new(1, -210, 1, -210)
-controlFrame.Visible = false
-controlFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+-- Virtual joystick base for movement (XZ)
+local joystickBase = Instance.new("Frame", gui)
+joystickBase.Size = UDim2.new(0, 100, 0, 100)
+joystickBase.Position = UDim2.new(0, 10, 1, -180)
+joystickBase.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+joystickBase.BackgroundTransparency = 0.5
+joystickBase.Visible = false
+joystickBase.ClipsDescendants = true
+joystickBase.AnchorPoint = Vector2.new(0,1)
 
-local dirs = {
-	{ "↑", Vector3.new(0, 0, -1), UDim2.new(0.5, -25, 0, 0) }, -- Forward
-	{ "↓", Vector3.new(0, 0, 1), UDim2.new(0.5, -25, 0, 100) }, -- Back
-	{ "←", Vector3.new(-1, 0, 0), UDim2.new(0, 0, 0, 50) }, -- Left
-	{ "→", Vector3.new(1, 0, 0), UDim2.new(0, 100, 0, 50) }, -- Right
-	{ "⇧", Vector3.new(0, 1, 0), UDim2.new(0, 0, 0, 0) }, -- Up
-	{ "⇩", Vector3.new(0, -1, 0), UDim2.new(0, 100, 0, 0) }, -- Down
-}
+local joystickThumb = Instance.new("Frame", joystickBase)
+joystickThumb.Size = UDim2.new(0, 40, 0, 40)
+joystickThumb.Position = UDim2.new(0.5, -20, 0.5, -20)
+joystickThumb.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+joystickThumb.BackgroundTransparency = 0.3
+joystickThumb.AnchorPoint = Vector2.new(0.5, 0.5)
+joystickThumb.BorderSizePixel = 0
+joystickThumb.Visible = true
 
-local moveDir = Vector3.zero
+-- Up and Down buttons for Y axis
+local upBtn = Instance.new("TextButton", gui)
+upBtn.Size = UDim2.new(0, 50, 0, 50)
+upBtn.Position = UDim2.new(1, -70, 1, -230)
+upBtn.Text = "Up"
+upBtn.TextScaled = true
+upBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+upBtn.Visible = false
+
+local downBtn = Instance.new("TextButton", gui)
+downBtn.Size = UDim2.new(0, 50, 0, 50)
+downBtn.Position = UDim2.new(1, -130, 1, -230)
+downBtn.Text = "Down"
+downBtn.TextScaled = true
+downBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+downBtn.Visible = false
+
+-- Variables
 local isAstral = false
-local originalCFrame = nil
-local buttons = {}
+local moveVector = Vector3.new()
+local verticalMove = 0
+local camRotation = Vector2.new(0,0) -- x = yaw, y = pitch
+local sensitivity = 0.005
+local speed = 1
 
-for _, d in ipairs(dirs) do
-	local btn = Instance.new("TextButton", controlFrame)
-	btn.Text = d[1]
-	btn.Size = UDim2.new(0, 50, 0, 50)
-	btn.Position = d[3]
-	btn.TextScaled = true
-	btn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-
-	btn.MouseButton1Down:Connect(function()
-		moveDir = d[2]
-	end)
-	btn.MouseButton1Up:Connect(function()
-		moveDir = Vector3.zero
-	end)
+local function clamp(val, min, max)
+	return math.max(min, math.min(max, val))
 end
 
--- ปุ่มถอดจิต
+-- Touch drag to rotate camera
+local dragging = false
+local lastPos = nil
+
+UserInputService.TouchStarted:Connect(function(input)
+	if not isAstral then return end
+	if input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		lastPos = input.Position
+	end
+end)
+
+UserInputService.TouchMoved:Connect(function(input)
+	if dragging and isAstral then
+		local delta = input.Position - lastPos
+		lastPos = input.Position
+		camRotation = camRotation + Vector2.new(-delta.X, -delta.Y) * sensitivity
+		camRotation = Vector2.new(camRotation.X, clamp(camRotation.Y, -math.pi/2 + 0.1, math.pi/2 - 0.1))
+	end
+end)
+
+UserInputService.TouchEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+
+-- Virtual joystick logic
+local joystickDragging = false
+local joystickCenter = joystickBase.AbsolutePosition + joystickBase.AbsoluteSize/2
+local maxRadius = joystickBase.AbsoluteSize.X / 2
+
+local function updateJoystick(inputPos)
+	local delta = inputPos - joystickCenter
+	local distance = math.min(maxRadius, (delta - joystickCenter).Magnitude)
+	if distance > maxRadius then distance = maxRadius end
+	local direction = (inputPos - joystickCenter).Unit
+	local offset = direction * math.min(distance, maxRadius)
+
+	joystickThumb.Position = UDim2.new(0.5, offset.X, 0.5, offset.Y)
+
+	-- Convert to Vector3 for movement (X,Z)
+	local x = offset.X / maxRadius
+	local z = offset.Y / maxRadius
+	moveVector = Vector3.new(x, 0, z)
+end
+
+joystickBase.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then
+		joystickDragging = true
+		updateJoystick(input.Position)
+	end
+end)
+
+joystickBase.InputChanged:Connect(function(input)
+	if joystickDragging and input.UserInputType == Enum.UserInputType.Touch then
+		updateJoystick(input.Position)
+	end
+end)
+
+joystickBase.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then
+		joystickDragging = false
+		moveVector = Vector3.zero
+		joystickThumb.Position = UDim2.new(0.5, 0, 0.5, 0)
+	end
+end)
+
+-- Up/down buttons
+local upPressed = false
+local downPressed = false
+
+upBtn.MouseButton1Down:Connect(function()
+	upPressed = true
+end)
+upBtn.MouseButton1Up:Connect(function()
+	upPressed = false
+end)
+downBtn.MouseButton1Down:Connect(function()
+	downPressed = true
+end)
+downBtn.MouseButton1Up:Connect(function()
+	downPressed = false
+end)
+
+-- Toggle freecam
 toggleBtn.MouseButton1Click:Connect(function()
 	if not isAstral then
-		local head = player.Character:FindFirstChild("Head")
+		local head = player.Character and player.Character:FindFirstChild("Head")
 		if head then
-			originalCFrame = head.CFrame
 			camera.CameraType = Enum.CameraType.Scriptable
-			camera.CFrame = head.CFrame + Vector3.new(0, 5, 0)
-			controlFrame.Visible = true
-			returnBtn.Visible = true
+			camera.CFrame = head.CFrame + Vector3.new(0,5,0)
+			camRotation = Vector2.new(0,0)
 			isAstral = true
+			toggleBtn.Visible = false
+			returnBtn.Visible = true
+			joystickBase.Visible = true
+			upBtn.Visible = true
+			downBtn.Visible = true
 		end
 	end
 end)
 
--- ปุ่มกลับเข้าร่าง
+-- Return to body
 returnBtn.MouseButton1Click:Connect(function()
 	if isAstral then
 		camera.CameraType = Enum.CameraType.Custom
-		controlFrame.Visible = false
-		returnBtn.Visible = false
 		isAstral = false
+		toggleBtn.Visible = true
+		returnBtn.Visible = false
+		joystickBase.Visible = false
+		upBtn.Visible = false
+		downBtn.Visible = false
 	end
 end)
 
--- เคลื่อนกล้อง
+-- Update camera every frame
 RunService.RenderStepped:Connect(function()
-	if isAstral and moveDir.Magnitude > 0 then
-		camera.CFrame = camera.CFrame + camera.CFrame:VectorToWorldSpace(moveDir.Unit * 1)
+	if isAstral then
+		-- Rotate camera
+		local cf = CFrame.new(camera.CFrame.Position) 
+			* CFrame.Angles(0, camRotation.X, 0) 
+			* CFrame.Angles(camRotation.Y, 0, 0)
+
+		-- Movement vector relative to camera rotation
+		local moveDir = cf:VectorToWorldSpace(Vector3.new(moveVector.X, 0, moveVector.Z))
+		local vertical = 0
+		if upPressed then vertical = 1 elseif downPressed then vertical = -1 end
+
+		camera.CFrame = camera.CFrame + moveDir.Unit * speed + Vector3.new(0, vertical * speed, 0)
+		camera.CFrame = CFrame.new(camera.CFrame.Position) * CFrame.Angles(0, camRotation.X, 0) * CFrame.Angles(camRotation.Y, 0, 0)
 	end
 end)
