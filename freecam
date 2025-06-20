@@ -1,16 +1,18 @@
+-- Freecam System with Full Movement in All Directions (Mobile Friendly)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ContextActionService = game:GetService("ContextActionService")
 
 local player = Players.LocalPlayer
 repeat wait() until player and player.Character and player:FindFirstChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
--- แก้ตัวแปรล็อคการเดินตัวละคร
-local walkDisabled = false
+local function clamp(val, min, max)
+	return math.max(min, math.min(max, val))
+end
 
--- ฟังก์ชันปิดการเดินตัวละคร
+-- Lock/Unlock Character Movement
 local function disableCharacterMovement()
 	local character = player.Character
 	if character then
@@ -22,7 +24,6 @@ local function disableCharacterMovement()
 	end
 end
 
--- ฟังก์ชันเปิดการเดินตัวละคร
 local function enableCharacterMovement()
 	local character = player.Character
 	if character then
@@ -34,12 +35,11 @@ local function enableCharacterMovement()
 	end
 end
 
--- สร้าง GUI
+-- UI Setup
 local gui = Instance.new("ScreenGui", player.PlayerGui)
-gui.Name = "FreecamGui"
-gui.ResetOnSpawn = false
+gu ResetOnSpawn = false
+gu.Name = "FreecamGui"
 
--- ปุ่ม Freecam toggle
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 130, 0, 60)
 toggleBtn.Position = UDim2.new(0, 20, 1, -90)
@@ -49,7 +49,6 @@ toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 toggleBtn.AnchorPoint = Vector2.new(0, 1)
 toggleBtn.ZIndex = 10
 
--- ปุ่ม Return
 local returnBtn = Instance.new("TextButton", gui)
 returnBtn.Size = UDim2.new(0, 130, 0, 60)
 returnBtn.Position = UDim2.new(0, 170, 1, -90)
@@ -60,7 +59,6 @@ returnBtn.AnchorPoint = Vector2.new(0, 1)
 returnBtn.Visible = false
 returnBtn.ZIndex = 10
 
--- Virtual joystick base
 local joystickBase = Instance.new("Frame", gui)
 joystickBase.Size = UDim2.new(0, 110, 0, 110)
 joystickBase.Position = UDim2.new(0, 20, 1, -230)
@@ -83,7 +81,6 @@ joystickThumb.BorderSizePixel = 0
 joystickThumb.ZIndex = 11
 joystickThumb.Visible = true
 
--- ปุ่มขึ้น-ลงแกน Y
 local upBtn = Instance.new("TextButton", gui)
 upBtn.Size = UDim2.new(0, 60, 0, 60)
 upBtn.Position = UDim2.new(1, -90, 1, -230)
@@ -104,22 +101,14 @@ downBtn.Visible = false
 downBtn.AnchorPoint = Vector2.new(1, 1)
 downBtn.ZIndex = 10
 
--- ตัวแปรสถานะ
 local isFreecam = false
 local moveVector = Vector3.new()
-local camRotation = Vector2.new(0,0) -- yaw, pitch
+local camRotation = Vector2.new(0,0)
 local sensitivity = 0.005
 local speed = 2
 
--- ฟังก์ชัน clamp
-local function clamp(val, min, max)
-	return math.max(min, math.min(max, val))
-end
-
--- Touch drag หมุนกล้อง
 local dragging = false
 local lastPos = nil
-
 UserInputService.TouchStarted:Connect(function(input)
 	if not isFreecam then return end
 	if input.UserInputType == Enum.UserInputType.Touch then
@@ -143,24 +132,17 @@ UserInputService.TouchEnded:Connect(function(input)
 	end
 end)
 
--- Joystick Logic
 local joystickDragging = false
 local joystickCenter = joystickBase.AbsolutePosition + joystickBase.AbsoluteSize/2
 local maxRadius = joystickBase.AbsoluteSize.X / 2
 
 local function updateJoystick(inputPos)
 	local delta = inputPos - joystickCenter
-	local distance = math.min(maxRadius, (delta - joystickCenter).Magnitude)
-	if distance > maxRadius then distance = maxRadius end
-	local direction = (inputPos - joystickCenter).Unit
-	local offset = direction * math.min(distance, maxRadius)
-
+	local direction = (delta).Unit
+	local distance = math.min(delta.Magnitude, maxRadius)
+	local offset = direction * distance
 	joystickThumb.Position = UDim2.new(0.5, offset.X, 0.5, offset.Y)
-
-	-- แปลงเป็น Vector3 สำหรับการเดิน (X,Z)
-	local x = offset.X / maxRadius
-	local z = offset.Y / maxRadius
-	moveVector = Vector3.new(x, 0, z)
+	moveVector = Vector3.new(offset.X / maxRadius, 0, offset.Y / maxRadius)
 end
 
 joystickBase.InputBegan:Connect(function(input)
@@ -184,36 +166,23 @@ joystickBase.InputEnded:Connect(function(input)
 	end
 end)
 
--- ปุ่มขึ้น-ลงแกน Y
 local upPressed = false
 local downPressed = false
 
-upBtn.MouseButton1Down:Connect(function()
-	upPressed = true
-end)
-upBtn.MouseButton1Up:Connect(function()
-	upPressed = false
-end)
-downBtn.MouseButton1Down:Connect(function()
-	downPressed = true
-end)
-downBtn.MouseButton1Up:Connect(function()
-	downPressed = false
-end)
+upBtn.MouseButton1Down:Connect(function() upPressed = true end)
+upBtn.MouseButton1Up:Connect(function() upPressed = false end)
+downBtn.MouseButton1Down:Connect(function() downPressed = true end)
+downBtn.MouseButton1Up:Connect(function() downPressed = false end)
 
--- เปิด freecam
 toggleBtn.MouseButton1Click:Connect(function()
 	if not isFreecam then
 		local head = player.Character and player.Character:FindFirstChild("Head")
 		if head then
-			-- disable character movement
 			disableCharacterMovement()
-			-- set camera
 			camera.CameraType = Enum.CameraType.Scriptable
 			camera.CFrame = head.CFrame + Vector3.new(0, 5, 0)
 			camRotation = Vector2.new(0, 0)
 			isFreecam = true
-			-- show gui
 			toggleBtn.Visible = false
 			returnBtn.Visible = true
 			joystickBase.Visible = true
@@ -223,15 +192,11 @@ toggleBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- ปิด freecam (กลับร่าง)
 returnBtn.MouseButton1Click:Connect(function()
 	if isFreecam then
-		-- enable character movement
 		enableCharacterMovement()
-		-- กล้องกลับแบบปกติ
 		camera.CameraType = Enum.CameraType.Custom
 		isFreecam = false
-		-- ซ่อน gui
 		toggleBtn.Visible = true
 		returnBtn.Visible = false
 		joystickBase.Visible = false
@@ -240,22 +205,25 @@ returnBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- อัพเดตกล้องทุกเฟรม
 RunService.RenderStepped:Connect(function()
 	if isFreecam then
 		local cf = CFrame.new(camera.CFrame.Position)
 			* CFrame.Angles(0, camRotation.X, 0)
 			* CFrame.Angles(camRotation.Y, 0, 0)
 
-		local moveDir = cf:VectorToWorldSpace(Vector3.new(moveVector.X, 0, moveVector.Z))
+		local right = camera.CFrame.RightVector
+		local forward = camera.CFrame.LookVector
+		local movement = (right * moveVector.X + forward * -moveVector.Z)
 		local vertical = 0
 		if upPressed then vertical = 1 elseif downPressed then vertical = -1 end
 
-		if moveDir.Magnitude > 0 then
-			moveDir = moveDir.Unit
+		if movement.Magnitude > 0 then
+			movement = movement.Unit * speed
 		end
 
-		camera.CFrame = camera.CFrame + moveDir * speed + Vector3.new(0, vertical * speed, 0)
-		camera.CFrame = CFrame.new(camera.CFrame.Position) * CFrame.Angles(0, camRotation.X, 0) * CFrame.Angles(camRotation.Y, 0, 0)
+		camera.CFrame = camera.CFrame + movement + Vector3.new(0, vertical * speed, 0)
+		camera.CFrame = CFrame.new(camera.CFrame.Position)
+			* CFrame.Angles(0, camRotation.X, 0)
+			* CFrame.Angles(camRotation.Y, 0, 0)
 	end
 end)
