@@ -6,107 +6,111 @@ local player = Players.LocalPlayer
 repeat wait() until player and player.Character and player:FindFirstChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
+-- Utility
 local function clamp(val, min, max)
 	return math.max(min, math.min(max, val))
 end
 
--- Lock/Unlock Character Movement
+-- Character Lock
 local function disableCharacterMovement()
-	local character = player.Character
-	if character then
-		local humanoid = character:FindFirstChildWhichIsA("Humanoid")
-		if humanoid then
-			humanoid.WalkSpeed = 0
-			humanoid.JumpPower = 0
-		end
+	local humanoid = player.Character and player.Character:FindFirstChildWhichIsA("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = 0
+		humanoid.JumpPower = 0
 	end
 end
 
 local function enableCharacterMovement()
-	local character = player.Character
-	if character then
-		local humanoid = character:FindFirstChildWhichIsA("Humanoid")
-		if humanoid then
-			humanoid.WalkSpeed = 16
-			humanoid.JumpPower = 50
-		end
+	local humanoid = player.Character and player.Character:FindFirstChildWhichIsA("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = 16
+		humanoid.JumpPower = 50
 	end
 end
 
--- UI Setup
+-- UI
 local gui = Instance.new("ScreenGui", player.PlayerGui)
-gui.ResetOnSpawn = false
 gui.Name = "FreecamGui"
+gui.ResetOnSpawn = false
 
-local toggleBtn = Instance.new("TextButton", gui)
-toggleBtn.Size = UDim2.new(0, 130, 0, 60)
-toggleBtn.Position = UDim2.new(0, 20, 1, -90)
-toggleBtn.Text = "Freecam"
-toggleBtn.TextScaled = true
-toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-toggleBtn.AnchorPoint = Vector2.new(0, 1)
-toggleBtn.ZIndex = 10
+local function createArrow(text, pos)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 60, 0, 60)
+	btn.Position = pos
+	btn.Text = text
+	btn.TextScaled = true
+	btn.AnchorPoint = Vector2.new(0.5, 0.5)
+	btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	btn.ZIndex = 10
+	btn.Parent = gui
+	btn.Visible = false
+	return btn
+end
 
-local returnBtn = Instance.new("TextButton", gui)
-returnBtn.Size = UDim2.new(0, 130, 0, 60)
-returnBtn.Position = UDim2.new(0, 170, 1, -90)
-returnBtn.Text = "Return"
-returnBtn.TextScaled = true
-returnBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-returnBtn.AnchorPoint = Vector2.new(0, 1)
-returnBtn.Visible = false
-returnBtn.ZIndex = 10
+local btnToggle = Instance.new("TextButton", gui)
+btnToggle.Size = UDim2.new(0, 130, 0, 60)
+btnToggle.Position = UDim2.new(0, 20, 1, -90)
+btnToggle.Text = "Freecam"
+btnToggle.TextScaled = true
+btnToggle.AnchorPoint = Vector2.new(0, 1)
+btnToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+btnToggle.ZIndex = 10
 
-local joystickBase = Instance.new("Frame", gui)
-joystickBase.Size = UDim2.new(0, 110, 0, 110)
-joystickBase.Position = UDim2.new(0, 20, 1, -230)
-joystickBase.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-joystickBase.BackgroundTransparency = 0.5
-joystickBase.Visible = false
-joystickBase.ClipsDescendants = true
-joystickBase.AnchorPoint = Vector2.new(0, 1)
-joystickBase.ZIndex = 10
-joystickBase.BorderSizePixel = 0
-joystickBase.Active = true
+local btnReturn = Instance.new("TextButton", gui)
+btnReturn.Size = UDim2.new(0, 130, 0, 60)
+btnReturn.Position = UDim2.new(0, 170, 1, -90)
+btnReturn.Text = "Return"
+btnReturn.TextScaled = true
+btnReturn.AnchorPoint = Vector2.new(0, 1)
+btnReturn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+btnReturn.Visible = false
+btnReturn.ZIndex = 10
 
-local joystickThumb = Instance.new("Frame", joystickBase)
-joystickThumb.Size = UDim2.new(0, 50, 0, 50)
-joystickThumb.Position = UDim2.new(0.5, 0, 0.5, 0)
-joystickThumb.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
-joystickThumb.BackgroundTransparency = 0.3
-joystickThumb.AnchorPoint = Vector2.new(0.5, 0.5)
-joystickThumb.BorderSizePixel = 0
-joystickThumb.ZIndex = 11
-joystickThumb.Visible = true
+-- Arrow Buttons
+local arrowUp = createArrow("▲", UDim2.new(0, 80, 1, -230))
+local arrowDown = createArrow("▼", UDim2.new(0, 80, 1, -100))
+local arrowLeft = createArrow("◀", UDim2.new(0, 20, 1, -165))
+local arrowRight = createArrow("▶", UDim2.new(0, 140, 1, -165))
+local btnUp = createArrow("⬆", UDim2.new(1, -90, 1, -230))
+local btnDown = createArrow("⬇", UDim2.new(1, -160, 1, -230))
 
-local upBtn = Instance.new("TextButton", gui)
-upBtn.Size = UDim2.new(0, 60, 0, 60)
-upBtn.Position = UDim2.new(1, -90, 1, -230)
-upBtn.Text = "▲"
-upBtn.TextScaled = true
-upBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-upBtn.Visible = false
-upBtn.AnchorPoint = Vector2.new(1, 1)
-upBtn.ZIndex = 10
-
-local downBtn = Instance.new("TextButton", gui)
-downBtn.Size = UDim2.new(0, 60, 0, 60)
-downBtn.Position = UDim2.new(1, -160, 1, -230)
-downBtn.Text = "▼"
-downBtn.TextScaled = true
-downBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-downBtn.Visible = false
-downBtn.AnchorPoint = Vector2.new(1, 1)
-downBtn.ZIndex = 10
-
--- Movement Vars
+-- Freecam Vars
 local isFreecam = false
-local moveVector = Vector3.new()
-local camRotation = Vector2.new(0,0)
-local sensitivity = 0.005
+local camRotation = Vector2.new(0, 0)
 local speed = 2
+local sensitivity = 0.005
+local moveDir = Vector3.new()
+local vertical = 0
 
--- Rotate by Touch
+-- Input Tracking
+local held = {
+	forward = false,
+	backward = false,
+	left = false,
+	right = false,
+	up = false,
+	down = false,
+}
+
+arrowUp.MouseButton1Down:Connect(function() held.forward = true end)
+arrowUp.MouseButton1Up:Connect(function() held.forward = false end)
+
+arrowDown.MouseButton1Down:Connect(function() held.backward = true end)
+arrowDown.MouseButton1Up:Connect(function() held.backward = false end)
+
+arrowLeft.MouseButton1Down:Connect(function() held.left = true end)
+arrowLeft.MouseButton1Up:Connect(function() held.left = false end)
+
+arrowRight.MouseButton1Down:Connect(function() held.right = true end)
+arrowRight.MouseButton1Up:Connect(function() held.right = false end)
+
+btnUp.MouseButton1Down:Connect(function() held.up = true end)
+btnUp.MouseButton1Up:Connect(function() held.up = false end)
+
+btnDown.MouseButton1Down:Connect(function() held.down = true end)
+btnDown.MouseButton1Up:Connect(function() held.down = false end)
+
+-- Touch Drag Rotate
 local dragging = false
 local lastPos = nil
 
@@ -123,7 +127,7 @@ UserInputService.TouchMoved:Connect(function(input)
 		local delta = input.Position - lastPos
 		lastPos = input.Position
 		camRotation = camRotation + Vector2.new(-delta.X, -delta.Y) * sensitivity
-		camRotation = Vector2.new(camRotation.X, clamp(camRotation.Y, -math.pi/2 + 0.1, math.pi/2 - 0.1))
+		camRotation = Vector2.new(camRotation.X, clamp(camRotation.Y, -math.pi / 2 + 0.1, math.pi / 2 - 0.1))
 	end
 end)
 
@@ -133,105 +137,63 @@ UserInputService.TouchEnded:Connect(function(input)
 	end
 end)
 
--- Joystick
-local joystickDragging = false
-local maxRadius = 50
-
-local function updateJoystick(inputPos)
-	local center = joystickBase.AbsolutePosition + joystickBase.AbsoluteSize / 2
-	maxRadius = joystickBase.AbsoluteSize.X / 2
-
-	local delta = inputPos - center
-	local direction = delta.Magnitude > 0 and delta.Unit or Vector2.zero
-	local distance = math.min(delta.Magnitude, maxRadius)
-	local offset = direction * distance
-
-	joystickThumb.Position = UDim2.new(0.5, offset.X, 0.5, offset.Y)
-	moveVector = Vector3.new(offset.X / maxRadius, 0, offset.Y / maxRadius)
-end
-
-joystickBase.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.Touch then
-		joystickDragging = true
-		updateJoystick(input.Position)
-	end
-end)
-
-joystickBase.InputChanged:Connect(function(input)
-	if joystickDragging and input.UserInputType == Enum.UserInputType.Touch then
-		updateJoystick(input.Position)
-	end
-end)
-
-joystickBase.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.Touch then
-		joystickDragging = false
-		moveVector = Vector3.zero
-		joystickThumb.Position = UDim2.new(0.5, 0, 0.5, 0)
-	end
-end)
-
--- Up/Down Buttons
-local upPressed = false
-local downPressed = false
-
-upBtn.MouseButton1Down:Connect(function() upPressed = true end)
-upBtn.MouseButton1Up:Connect(function() upPressed = false end)
-downBtn.MouseButton1Down:Connect(function() downPressed = true end)
-downBtn.MouseButton1Up:Connect(function() downPressed = false end)
-
--- Toggle Freecam On
-toggleBtn.MouseButton1Click:Connect(function()
+-- Toggle Freecam
+btnToggle.MouseButton1Click:Connect(function()
 	if not isFreecam then
 		local head = player.Character and player.Character:FindFirstChild("Head")
 		if head then
-			disableCharacterMovement()
 			camera.CameraType = Enum.CameraType.Scriptable
 			camera.CFrame = head.CFrame + Vector3.new(0, 5, 0)
-			camRotation = Vector2.new(0, 0)
+			disableCharacterMovement()
 			isFreecam = true
-			toggleBtn.Visible = false
-			returnBtn.Visible = true
-			joystickBase.Visible = true
-			upBtn.Visible = true
-			downBtn.Visible = true
-
-			-- Wait 1 frame for AbsoluteSize to be ready
-			RunService.RenderStepped:Wait()
-			maxRadius = joystickBase.AbsoluteSize.X / 2
+			btnToggle.Visible = false
+			btnReturn.Visible = true
+			arrowUp.Visible = true
+			arrowDown.Visible = true
+			arrowLeft.Visible = true
+			arrowRight.Visible = true
+			btnUp.Visible = true
+			btnDown.Visible = true
 		end
 	end
 end)
 
--- Toggle Freecam Off
-returnBtn.MouseButton1Click:Connect(function()
+-- Exit Freecam
+btnReturn.MouseButton1Click:Connect(function()
 	if isFreecam then
-		enableCharacterMovement()
 		camera.CameraType = Enum.CameraType.Custom
+		enableCharacterMovement()
 		isFreecam = false
-		toggleBtn.Visible = true
-		returnBtn.Visible = false
-		joystickBase.Visible = false
-		upBtn.Visible = false
-		downBtn.Visible = false
+		btnToggle.Visible = true
+		btnReturn.Visible = false
+		arrowUp.Visible = false
+		arrowDown.Visible = false
+		arrowLeft.Visible = false
+		arrowRight.Visible = false
+		btnUp.Visible = false
+		btnDown.Visible = false
 	end
 end)
 
--- Main Update Loop
+-- RenderStep
 RunService.RenderStepped:Connect(function()
 	if isFreecam then
-		local rotationCFrame = CFrame.Angles(0, camRotation.X, 0) * CFrame.Angles(camRotation.Y, 0, 0)
-		local forward = rotationCFrame.LookVector
-		local right = rotationCFrame.RightVector
+		local rotCFrame = CFrame.Angles(0, camRotation.X, 0) * CFrame.Angles(camRotation.Y, 0, 0)
+		local forward = rotCFrame.LookVector
+		local right = rotCFrame.RightVector
 
-		local movement = (right * moveVector.X + forward * -moveVector.Z)
-		local vertical = 0
-		if upPressed then vertical = 1 elseif downPressed then vertical = -1 end
+		local h = Vector3.new()
+		if held.forward then h = h + forward end
+		if held.backward then h = h - forward end
+		if held.left then h = h - right end
+		if held.right then h = h + right end
+		if h.Magnitude > 0 then h = h.Unit end
 
-		if movement.Magnitude > 0 then
-			movement = movement.Unit * speed
-		end
+		local v = 0
+		if held.up then v = 1 elseif held.down then v = -1 end
 
-		camera.CFrame = CFrame.new(camera.CFrame.Position + movement + Vector3.new(0, vertical * speed, 0)) * rotationCFrame
+		local offset = h * speed + Vector3.new(0, v * speed, 0)
+		camera.CFrame = camera.CFrame + offset
+		camera.CFrame = CFrame.new(camera.CFrame.Position) * rotCFrame
 	end
 end)
