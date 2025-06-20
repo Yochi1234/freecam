@@ -1,0 +1,63 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ContextActionService = game:GetService("ContextActionService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local isAstral = false
+local moveSpeed = 50
+
+-- กล้องแยกร่าง
+local cameraPart = Instance.new("Part")
+cameraPart.Anchored = true
+cameraPart.CanCollide = false
+cameraPart.Transparency = 1
+cameraPart.Size = Vector3.new(1, 1, 1)
+cameraPart.Name = "AstralCamPart"
+cameraPart.Parent = workspace
+
+local connection
+
+-- ควบคุมการเคลื่อนกล้อง
+local function onRenderStep(dt)
+	if isAstral then
+		local moveVec = Vector3.zero
+		local inputVector = Vector3.zero
+
+		-- รองรับมือถือด้วย Thumbstick
+		inputVector = UserInputService:GetGamepadState(Enum.UserInputType.Gamepad1)[1] and 
+                      UserInputService:GetGamepadState(Enum.UserInputType.Gamepad1)[1].Position or Vector3.zero
+
+		-- หรือ ใช้ WASD/ปุ่มจำลอง
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= camera.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += camera.CFrame.RightVector end
+
+		-- เพิ่มทิศทางจาก Thumbstick (มือถือ)
+		moveVec += (camera.CFrame.LookVector * inputVector.Y)
+		moveVec += (camera.CFrame.RightVector * inputVector.X)
+
+		cameraPart.Position += moveVec.Unit * moveSpeed * dt
+		camera.CFrame = CFrame.new(cameraPart.Position, cameraPart.Position + camera.CFrame.LookVector)
+	end
+end
+
+-- เปิด/ปิดโหมดถอดจิต
+local function toggleAstralMode()
+	isAstral = not isAstral
+	if isAstral then
+		cameraPart.Position = camera.CFrame.Position
+		camera.CameraType = Enum.CameraType.Scriptable
+		connection = RunService.RenderStepped:Connect(onRenderStep)
+	else
+		camera.CameraType = Enum.CameraType.Custom
+		if connection then connection:Disconnect() end
+	end
+end
+
+-- เชื่อมกับปุ่ม GUI (ไว้ใน StarterGui)
+local guiButton = player:WaitForChild("PlayerGui"):WaitForChild("AstralGui"):WaitForChild("ToggleButton")
+guiButton.MouseButton1Click:Connect(toggleAstralMode)
