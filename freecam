@@ -133,7 +133,16 @@ UserInputService.TouchEnded:Connect(function(input)
 end)
 
 local joystickDragging = false
-local joystickCenter = joystickBase.AbsolutePosition + joystickBase.AbsoluteSize/2
+local function updateJoystick(inputPos)
+	local center = joystickBase.AbsolutePosition + joystickBase.AbsoluteSize / 2
+	local delta = inputPos - center
+	local direction = delta.Magnitude > 0 and delta.Unit or Vector2.zero
+	local distance = math.min(delta.Magnitude, maxRadius)
+	local offset = direction * distance
+
+	joystickThumb.Position = UDim2.new(0.5, offset.X, 0.5, offset.Y)
+	moveVector = Vector3.new(offset.X / maxRadius, 0, offset.Y / maxRadius)
+end
 local maxRadius = joystickBase.AbsoluteSize.X / 2
 
 local function updateJoystick(inputPos)
