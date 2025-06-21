@@ -1,18 +1,17 @@
--- Freecam Script (Executor-compatible)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
+repeat wait() until player and player.Character and player:FindFirstChild("PlayerGui")
 local camera = workspace.CurrentCamera
-
-repeat wait() until player and player.Character and player:FindFirstChild("PlayerGui") and camera
 
 -- Utility
 local function clamp(val, min, max)
 	return math.max(min, math.min(max, val))
 end
 
+-- Character Lock
 local function disableCharacterMovement()
 	local humanoid = player.Character and player.Character:FindFirstChildWhichIsA("Humanoid")
 	if humanoid then
@@ -29,13 +28,11 @@ local function enableCharacterMovement()
 	end
 end
 
--- GUI setup
-local gui = Instance.new("ScreenGui")
+-- UI
+local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.Name = "FreecamGui"
 gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
 
--- Create Arrow Button
 local function createArrow(text, pos)
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(0, 60, 0, 60)
@@ -45,12 +42,11 @@ local function createArrow(text, pos)
 	btn.AnchorPoint = Vector2.new(0.5, 0.5)
 	btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 	btn.ZIndex = 10
-	btn.Visible = false
 	btn.Parent = gui
+	btn.Visible = false
 	return btn
 end
 
--- Main buttons
 local btnToggle = Instance.new("TextButton", gui)
 btnToggle.Size = UDim2.new(0, 130, 0, 60)
 btnToggle.Position = UDim2.new(0, 20, 1, -90)
@@ -70,7 +66,7 @@ btnReturn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
 btnReturn.Visible = false
 btnReturn.ZIndex = 10
 
--- Arrows
+-- Arrow Buttons
 local arrowUp = createArrow("▲", UDim2.new(0, 80, 1, -230))
 local arrowDown = createArrow("▼", UDim2.new(0, 80, 1, -100))
 local arrowLeft = createArrow("◀", UDim2.new(0, 20, 1, -165))
@@ -78,11 +74,24 @@ local arrowRight = createArrow("▶", UDim2.new(0, 140, 1, -165))
 local btnUp = createArrow("⬆", UDim2.new(1, -90, 1, -230))
 local btnDown = createArrow("⬇", UDim2.new(1, -160, 1, -230))
 
--- Freecam variables
+-- Transparent Frame for Touch Rotate
+local dragFrame = Instance.new("Frame")
+dragFrame.Size = UDim2.new(1, 0, 1, 0)
+dragFrame.Position = UDim2.new(0, 0, 0, 0)
+dragFrame.BackgroundTransparency = 1
+dragFrame.ZIndex = 5
+dragFrame.Visible = false
+dragFrame.Parent = gui
+
+-- Freecam Vars
 local isFreecam = false
 local camRotation = Vector2.new(0, 0)
 local speed = 2
 local sensitivity = 0.005
+local moveDir = Vector3.new()
+local vertical = 0
+
+-- Input Tracking
 local held = {
 	forward = false,
 	backward = false,
@@ -92,34 +101,37 @@ local held = {
 	down = false,
 }
 
--- Input bindings
 arrowUp.MouseButton1Down:Connect(function() held.forward = true end)
 arrowUp.MouseButton1Up:Connect(function() held.forward = false end)
+
 arrowDown.MouseButton1Down:Connect(function() held.backward = true end)
 arrowDown.MouseButton1Up:Connect(function() held.backward = false end)
+
 arrowLeft.MouseButton1Down:Connect(function() held.left = true end)
 arrowLeft.MouseButton1Up:Connect(function() held.left = false end)
+
 arrowRight.MouseButton1Down:Connect(function() held.right = true end)
 arrowRight.MouseButton1Up:Connect(function() held.right = false end)
+
 btnUp.MouseButton1Down:Connect(function() held.up = true end)
 btnUp.MouseButton1Up:Connect(function() held.up = false end)
+
 btnDown.MouseButton1Down:Connect(function() held.down = true end)
 btnDown.MouseButton1Up:Connect(function() held.down = false end)
 
--- Touch rotate
+-- Touch Rotate on dragFrame
 local dragging = false
-local lastPos
+local lastPos = nil
 
-UserInputService.TouchStarted:Connect(function(input)
-	if not isFreecam then return end
-	if input.UserInputType == Enum.UserInputType.Touch then
+dragFrame.InputBegan:Connect(function(input)
+	if isFreecam and input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		lastPos = input.Position
 	end
 end)
 
-UserInputService.TouchMoved:Connect(function(input)
-	if dragging and isFreecam then
+dragFrame.InputChanged:Connect(function(input)
+	if isFreecam and dragging and input.UserInputType == Enum.UserInputType.Touch then
 		local delta = input.Position - lastPos
 		lastPos = input.Position
 		camRotation = camRotation + Vector2.new(-delta.X, -delta.Y) * sensitivity
@@ -127,43 +139,53 @@ UserInputService.TouchMoved:Connect(function(input)
 	end
 end)
 
-UserInputService.TouchEnded:Connect(function(input)
+dragFrame.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.Touch then
 		dragging = false
 	end
 end)
 
--- Freecam toggle
+-- Toggle Freecam
 btnToggle.MouseButton1Click:Connect(function()
-	if isFreecam then return end
-	local head = player.Character and player.Character:FindFirstChild("Head")
-	if head then
-		camera.CameraType = Enum.CameraType.Scriptable
-		camera.CFrame = head.CFrame + Vector3.new(0, 5, 0)
-		disableCharacterMovement()
-		isFreecam = true
-		btnToggle.Visible = false
-		btnReturn.Visible = true
-		for _, b in pairs({arrowUp, arrowDown, arrowLeft, arrowRight, btnUp, btnDown}) do
-			b.Visible = true
+	if not isFreecam then
+		local head = player.Character and player.Character:FindFirstChild("Head")
+		if head then
+			camera.CameraType = Enum.CameraType.Scriptable
+			camera.CFrame = head.CFrame + Vector3.new(0, 5, 0)
+			disableCharacterMovement()
+			isFreecam = true
+			btnToggle.Visible = false
+			btnReturn.Visible = true
+			arrowUp.Visible = true
+			arrowDown.Visible = true
+			arrowLeft.Visible = true
+			arrowRight.Visible = true
+			btnUp.Visible = true
+			btnDown.Visible = true
+			dragFrame.Visible = true
 		end
 	end
 end)
 
--- Return control
+-- Exit Freecam
 btnReturn.MouseButton1Click:Connect(function()
-	if not isFreecam then return end
-	camera.CameraType = Enum.CameraType.Custom
-	enableCharacterMovement()
-	isFreecam = false
-	btnToggle.Visible = true
-	btnReturn.Visible = false
-	for _, b in pairs({arrowUp, arrowDown, arrowLeft, arrowRight, btnUp, btnDown}) do
-		b.Visible = false
+	if isFreecam then
+		camera.CameraType = Enum.CameraType.Custom
+		enableCharacterMovement()
+		isFreecam = false
+		btnToggle.Visible = true
+		btnReturn.Visible = false
+		arrowUp.Visible = false
+		arrowDown.Visible = false
+		arrowLeft.Visible = false
+		arrowRight.Visible = false
+		btnUp.Visible = false
+		btnDown.Visible = false
+		dragFrame.Visible = false
 	end
 end)
 
--- Camera update
+-- RenderStep
 RunService.RenderStepped:Connect(function()
 	if isFreecam then
 		local rotCFrame = CFrame.Angles(0, camRotation.X, 0) * CFrame.Angles(camRotation.Y, 0, 0)
